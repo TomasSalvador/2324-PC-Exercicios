@@ -59,7 +59,16 @@ class ThreadPool(
                 }
             }
             while (true) {
-                termCond.await()
+                try {
+                    termCond.await()
+                } catch (ex: InterruptedException){
+                    if (activeThreads==0){
+                        Thread.currentThread().interrupt()
+                        return
+                    }
+                    throw ex
+                }
+                
                 if (activeThreads==0){
                     return
                 }
@@ -79,7 +88,7 @@ class ThreadPool(
                     if (shuttingDown) {
                         activeThreads--
                         if (activeThreads == 0) {
-                            termCond.signal()
+                            termCond.signalAll()
                         }
                         return
                     }

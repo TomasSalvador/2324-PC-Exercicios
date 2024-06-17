@@ -48,7 +48,7 @@ class MessageBroadcaster<T> {
     fun sendToAll(message: T): List<Thread> {
         lock.withLock {
             val threads = waitingThreads.toList().map { it.thread }
-            waitingThreads.map { it.msg = message }
+            waitingThreads.forEach { it.msg = message }
             waitingThreads.clear()
             condition.signalAll()
             return threads
