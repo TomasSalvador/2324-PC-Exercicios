@@ -39,6 +39,7 @@ class MessageBroadcaster<T> {
                 }
 
                 if (remainingTime <= 0) {
+                    waitingThreads.remove(thread)
                     return null
                 }
             }
