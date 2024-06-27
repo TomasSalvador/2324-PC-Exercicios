@@ -1,5 +1,6 @@
 package exames.pc_2223v_1
 
+import NodeLinkedList
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.locks.Condition
 import java.util.concurrent.locks.ReentrantLock
@@ -23,8 +24,8 @@ class ThreadPool(
 
     private val lock = ReentrantLock()
     private var activeThreads = nOfThreads
-    private val waitingThreads = mutableListOf<WaintingThread>()
-    private val runnables = mutableListOf<Runnable>()
+    private val waitingThreads = NodeLinkedList<WaintingThread>()
+    private val runnables = NodeLinkedList<Runnable>()
     private var shuttingDown = false
     private val termCond = lock.newCondition()
 
@@ -35,13 +36,13 @@ class ThreadPool(
             if (shuttingDown) {
                 throw RejectedExecutionException()
             }
-            if (waitingThreads.isNotEmpty()) {
-                val workerTh = waitingThreads.removeFirst()
+            if (waitingThreads.notEmpty) {
+                val workerTh = waitingThreads.pull().value
                 workerTh.runnable = runnable
                 workerTh.condition.signal()
                 return
             }
-            runnables.add(runnable)
+            runnables.enqueue(runnable)
             return
         }
     }
@@ -50,10 +51,12 @@ class ThreadPool(
     fun shutdownAndWaitForTermination(): Unit {
         lock.withLock {
             shuttingDown = true
-            if (runnables.isEmpty() && waitingThreads.isNotEmpty()) {
-                val wtsize = waitingThreads.size
+            if (runnables.empty && waitingThreads.notEmpty) {
+                val wtsize = waitingThreads.count
                 waitingThreads.forEach { it.condition.signal() }
-                waitingThreads.clear()
+                while (waitingThreads.notEmpty) {
+                    waitingThreads.pull()
+                }
                 if (wtsize==activeThreads) {
                     return
                 }
@@ -82,8 +85,8 @@ class ThreadPool(
         var runnable: Runnable? = null
         while (true) {
             lock.withLock {
-                if (runnables.isNotEmpty()) {
-                    runnable = runnables.removeFirst()
+                if (runnables.notEmpty) {
+                    runnable = runnables.pull().value
                 } else {
                     if (shuttingDown) {
                         activeThreads--
@@ -94,7 +97,7 @@ class ThreadPool(
                     }
 
                     try {
-                        waitingThreads.add(thisThread)
+                        waitingThreads.enqueue(thisThread)
                         cond.await()
                     } catch (ex: InterruptedException) {
                         // ignored
